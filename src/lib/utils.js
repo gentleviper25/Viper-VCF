@@ -1,32 +1,44 @@
 /**
  * src/lib/utils.js
- * Shared utility helpers.
+ * Shared utility helpers — zero external dependencies.
  */
-import { formatDistanceToNow, format, isPast } from 'date-fns'
 
 /** Generate a cryptographically random session code */
 export function generateSessionCode(len = 10) {
-  const chars  = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no confusable chars
-  const arr    = new Uint8Array(len)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no confusable chars
+  const arr   = new Uint8Array(len)
   crypto.getRandomValues(arr)
   return Array.from(arr, b => chars[b % chars.length]).join('')
 }
 
-/** Format a date string nicely */
+/** Format a date string nicely using Intl */
 export function formatDate(dateStr) {
   if (!dateStr) return '—'
   try {
-    return format(new Date(dateStr), 'MMM d, yyyy · h:mm a')
+    return new Intl.DateTimeFormat('en-US', {
+      month:  'short',
+      day:    'numeric',
+      year:   'numeric',
+      hour:   '2-digit',
+      minute: '2-digit',
+    }).format(new Date(dateStr))
   } catch {
     return '—'
   }
 }
 
-/** Relative time e.g. "3 hours ago" */
+/** Relative time e.g. "3 hours ago" using Intl.RelativeTimeFormat */
 export function relativeTime(dateStr) {
   if (!dateStr) return '—'
   try {
-    return formatDistanceToNow(new Date(dateStr), { addSuffix: true })
+    const diff = new Date(dateStr) - Date.now()
+    const rtf  = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+    const abs  = Math.abs(diff)
+    if (abs < 60_000)        return rtf.format(Math.round(diff / 1_000),        'second')
+    if (abs < 3_600_000)     return rtf.format(Math.round(diff / 60_000),       'minute')
+    if (abs < 86_400_000)    return rtf.format(Math.round(diff / 3_600_000),    'hour')
+    if (abs < 2_592_000_000) return rtf.format(Math.round(diff / 86_400_000),   'day')
+    return rtf.format(Math.round(diff / 2_592_000_000), 'month')
   } catch {
     return '—'
   }
@@ -35,10 +47,10 @@ export function relativeTime(dateStr) {
 /** Check if a session is expired */
 export function isExpired(expiryStr) {
   if (!expiryStr) return false
-  try { return isPast(new Date(expiryStr)) } catch { return false }
+  try { return new Date(expiryStr) < new Date() } catch { return false }
 }
 
-/** Time remaining label */
+/** Time remaining label e.g. "3h 22m left" */
 export function timeLeft(expiryStr) {
   if (!expiryStr) return '—'
   try {
@@ -59,7 +71,6 @@ export async function copyToClipboard(text) {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    // Fallback
     const el = document.createElement('textarea')
     el.value = text
     el.style.cssText = 'position:fixed;opacity:0'
@@ -88,7 +99,7 @@ export function debounce(fn, ms = 300) {
   }
 }
 
-/** Rate-limiter for public submissions using sessionStorage */
+/** Client-side rate-limiter using sessionStorage */
 export function checkSubmissionCooldown(sessionCode) {
   const key      = `vcf_cooldown_${sessionCode}`
   const last     = sessionStorage.getItem(key)
