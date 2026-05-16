@@ -1,10 +1,8 @@
 /**
- * src/components/layout/Navbar.jsx
- * Top navigation bar for public pages (Landing, Auth).
+ * src/components/layout/Navbar.jsx — Public pages nav
  */
-import { LogoMark } from '@/components/ui/ViperLogo'
-import Button       from '@/components/ui/Button'
-import { useAuth }  from '@/context/AuthContext'
+import { LogoMark }  from '@/components/ui/ViperLogo'
+import { useAuth }   from '@/context/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
 
 export default function Navbar() {
@@ -13,53 +11,32 @@ export default function Navbar() {
 
   return (
     <nav style={{
-      position:        'fixed',
-      top:             0,
-      left:            0,
-      right:           0,
-      zIndex:          100,
-      height:          68,
-      display:         'flex',
-      alignItems:      'center',
-      padding:         '0 24px',
-      borderBottom:    '1px solid rgba(139,92,246,0.1)',
-      background:      'rgba(0,0,0,0.7)',
-      backdropFilter:  'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      position:'fixed', top:0, left:0, right:0, zIndex:100,
+      height:66, display:'flex', alignItems:'center', padding:'0 40px',
+      background:'rgba(0,0,0,0.6)', backdropFilter:'blur(20px)',
+      borderBottom:'1px solid rgba(255,255,255,0.06)',
     }}>
-      <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'flex', alignItems: 'center', gap: 40 }}>
-        {/* Logo */}
-        <LogoMark onClick={() => navigate('/')} />
-
-        {/* Nav links – centered */}
-        <div style={{ display: 'flex', gap: 28, flex: 1 }} className="hide-mobile">
-          <Link to="/#features" className="nav-link">Features</Link>
-          <Link to="/#how"      className="nav-link">How it Works</Link>
-          <Link to="/#contact"  className="nav-link">Contact</Link>
-        </div>
-
-        {/* Auth CTA */}
-        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-          {isAuthenticated ? (
-            <Button variant="primary" size="sm" onClick={() => navigate('/dashboard')}>
-              Dashboard
-            </Button>
-          ) : (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>
-                Login
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => navigate('/register')}
-                style={{ border: '1px solid rgba(139,92,246,0.45)', color: '#fff' }}
-              >
-                Sign Up
-              </Button>
-            </>
-          )}
-        </div>
+      <LogoMark onClick={()=>navigate('/')}/>
+      <div style={{ display:'flex', gap:32, marginLeft:48 }}>
+        {['Home','How it Works','Contact'].map(l=>(
+          <span key={l} className="nav-link" onClick={()=>navigate('/')}>{l}</span>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:10, marginLeft:'auto' }}>
+        {isAuthenticated ? (
+          <button className="btn btn-primary btn-sm" onClick={()=>navigate('/dashboard')}>Dashboard</button>
+        ) : (
+          <>
+            <button
+              onClick={()=>navigate('/login')}
+              style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.2)', borderRadius:10, padding:'8px 20px', color:'#fff', fontSize:14, fontWeight:500, cursor:'pointer', fontFamily:'Inter,sans-serif' }}
+            >Login</button>
+            <button
+              onClick={()=>navigate('/register')}
+              style={{ background:'linear-gradient(90deg,#7c3aed,#a855f7)', border:'none', borderRadius:10, padding:'8px 20px', color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'Inter,sans-serif', boxShadow:'0 4px 16px rgba(139,92,246,0.4)' }}
+            >Sign Up</button>
+          </>
+        )}
       </div>
     </nav>
   )

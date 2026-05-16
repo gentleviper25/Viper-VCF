@@ -1,6 +1,7 @@
 /**
  * src/context/AuthContext.jsx
  * Global authentication state via Supabase.
+ * Handles email confirmation, Google OAuth, and session persistence.
  */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/config/supabase'
@@ -12,7 +13,6 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  /* Load user profile from `users` table */
   async function fetchProfile(userId) {
     if (!userId) { setProfile(null); return }
     const { data } = await supabase
@@ -24,14 +24,12 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    /* Initial session */
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       fetchProfile(session?.user?.id)
       setLoading(false)
     })
 
-    /* Subscribe to auth state changes */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null)
@@ -41,34 +39,53 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  /* ── Auth actions ── */
+  /* ── friendly error messages ── */
+  function friendlyError(message = '') {
+    if (message.includes('Invalid login credentials'))
+      return 'Incorrect email or password. Please try again.'
+    if (message.includes('Email not confirmed'))
+      return 'Please check your email and click the confirmation link before logging in.'
+    if (message.includes('User already registered'))
+      return 'An account with this email already exists. Try logging in instead.'
+    if (message.includes('Password should be at least'))
+      return 'Password must be at least 6 characters.'
+    if (message.includes('Unable to validate email'))
+      return 'Please enter a valid email address.'
+    if (message.includes('signup is disabled'))
+      return 'Sign-ups are temporarily disabled. Please try again later.'
+    if (message.includes('rate limit') || message.includes('too many'))
+      return 'Too many attempts. Please wait a moment and try again.'
+    return message || 'Something went wrong. Please try again.'
+  }
 
   async function signUp({ email, password, fullName }) {
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email:    email.trim().toLowerCase(),
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName.trim() },
         emailRedirectTo: `${window.location.origin}/dashboard`,
       },
     })
-    if (error) throw error
+    if (error) throw new Error(friendlyError(error.message))
 
-    /* Insert profile row */
+    // Insert profile row (trigger also does this, belt-and-suspenders)
     if (data.user) {
       await supabase.from('users').upsert({
-        id:         data.user.id,
-        full_name:  fullName,
-        email:      email.toLowerCase().trim(),
-        created_at: new Date().toISOString(),
-      }, { onConflict: 'id' })
+        id:        data.user.id,
+        full_name: fullName.trim(),
+        email:     email.trim().toLowerCase(),
+      }, { onConflict: 'id', ignoreDuplicates: true })
     }
     return data
   }
 
   async function signIn({ email, password }) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email:    email.trim().toLowerCase(),
+      password,
+    })
+    if (error) throw new Error(friendlyError(error.message))
     return data
   }
 
@@ -77,7 +94,7 @@ export function AuthProvider({ children }) {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/dashboard` },
     })
-    if (error) throw error
+    if (error) throw new Error(friendlyError(error.message))
   }
 
   async function signOut() {
@@ -86,23 +103,20 @@ export function AuthProvider({ children }) {
     setProfile(null)
   }
 
-  const value = {
-    user,
-    profile,
-    loading,
-    isAuthenticated: !!user,
-    signUp,
-    signIn,
-    signInWithGoogle,
-    signOut,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{
+      user, profile, loading,
+      isAuthenticated: !!user,
+      signUp, signIn, signInWithGoogle, signOut,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
+  if (!ctx) throw new Error('useAuth must be inside <AuthProvider>')
   return ctx
 }
 
